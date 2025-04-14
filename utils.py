@@ -4,8 +4,6 @@ import hmac
 import hashlib
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
-import itertools
-
 
 def read_config():
     with open("config.json") as f:
