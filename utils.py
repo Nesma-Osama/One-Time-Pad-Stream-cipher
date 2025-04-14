@@ -90,12 +90,21 @@ def is_hmac_valid(key, message, received_hmac):
         return False
 
 
+def modify_seed(seed, len_message):
+    print("-------------------------------------------------------------------------")
+    print("modify_seed function ")
+    print(f"seed is {seed} len message is {len_message}")
+    hashed_key = hashlib.sha256(seed).digest()
+    print(f"Hashed key {hashed_key} key of 10 bytes {(hashed_key[0:len_message])}")
+    return hashed_key[0:len_message]
+
+
 def xor(message, key):
     print("-------------------------------------------------------------------------")
     print("xor function ")
     message_bytes = message.encode("utf-8") if isinstance(message, str) else message
     key_bytes = key.encode("utf-8") if isinstance(key, str) else key
-    repeated_key = itertools.cycle(key_bytes)
+    repeated_key = modify_seed(key_bytes, len(message))
     xor_result = bytes([m ^ k for m, k in zip(message_bytes, repeated_key)])
     return xor_result
 
