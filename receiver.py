@@ -1,20 +1,42 @@
 import socket
 from utils import *
+
+
 def main():
-    receiver=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    receiver.bind(('127.0.0.1',9999))
+    receiver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    receiver.bind(("127.0.0.1", 9999))
     receiver.listen(1)
     print("Receiver is listening on port 9999")
-    p,g=read_config()
-    a,ka=generate_DF_keys(p,g)
+    p, g, mult, c, m = read_config()
+    a, ka = generate_DF_keys(p, g)
     print(f"Receiver's private key: {a}, public key: {ka}")
     while True:
-        sender,_=receiver.accept()
-        kb=int(sender.recv(1024).decode())
+        sender, _ = receiver.accept()
+        kb = int(sender.recv(1024).decode())
+        shared_key = (kb**a) % p
         print(f"Received sender's public key: {kb}")
         sender.send(str(ka).encode())
-        aes_key,shared_secret=generate_AES_key(kb,a,p)
-        cipher_text=sender.recv(1024)
-        AES_dencryption(aes_key,cipher_text)
+        received_seed = sender.recv(1024).decode()
+        if not (is_hmac_valid(shared_key, received_seed[:-64], received_seed[-64:])):
+            print("message is not authentication")
+            break
+        seed = int(dencrypt_seed(shared_key, p, received_seed[:-64]))
+        with open("output.txt", "wb") as f:  # Open in binary mode ('wb')
+            while True:
+                length_bytes = sender.recv(4)
+                if not length_bytes or len(length_bytes) != 4:
+                    break 
+                chunk_length = int.from_bytes(length_bytes, byteorder='big')
+                encrypted_data = b''
+                while len(encrypted_data) < chunk_length:
+                    packet = sender.recv(chunk_length - len(encrypted_data))
+                    if not packet:
+                        break 
+                    encrypted_data += packet
+                if not encrypted_data:
+                    break 
+                seed = receive_message(f, encrypted_data, seed, mult, c, m)
         sender.close()
-main()   
+
+
+main()
