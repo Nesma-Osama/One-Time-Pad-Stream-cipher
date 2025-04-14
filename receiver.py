@@ -25,16 +25,16 @@ def main():
             while True:
                 length_bytes = sender.recv(4)
                 if not length_bytes or len(length_bytes) != 4:
-                    break 
-                chunk_length = int.from_bytes(length_bytes, byteorder='big')
-                encrypted_data = b''
+                    break
+                chunk_length = int.from_bytes(length_bytes, byteorder="big")
+                encrypted_data = b""
                 while len(encrypted_data) < chunk_length:
                     packet = sender.recv(chunk_length - len(encrypted_data))
                     if not packet:
-                        break 
+                        break
                     encrypted_data += packet
                 if not encrypted_data:
-                    break 
+                    break
                 seed = receive_message(f, encrypted_data, seed, mult, c, m)
         sender.close()
 
