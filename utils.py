@@ -134,8 +134,8 @@ def xor(message, key):
     print(f"  Key = {key}")
     message_bytes = message.encode("utf-8") if isinstance(message, str) else message
     key_bytes = key.encode("utf-8") if isinstance(key, str) else key
-    repeated_key = modify_seed(key_bytes, len(message))
-    xor_result = bytes([m ^ k for m, k in zip(message_bytes, repeated_key)])
+    # repeated_key = modify_seed(key_bytes, len(message))
+    xor_result = bytes([m ^ k for m, k in zip(message_bytes, key_bytes)])
     print("Output:")
     print(f"  XOR result = {xor_result}")
     return xor_result
@@ -152,16 +152,14 @@ def send_message(path, sender, initail_seed, a, c, m, chunk_size=10):
     seed = initail_seed
     with open(path, "r") as f:
         while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                print("[Info] End of file reached.")
-                break
-
             seed = LGC(seed, a, c, m)
             key = str(seed)
             print("[Step] New LCG Seed:", seed)
+            chunk = f.read(len(key))
+            if not chunk:
+                print("[Info] End of file reached.")
+                break
             message = xor(chunk, key)
-
             print("[Step] Sending encrypted message chunk...")
             sender.send(len(message).to_bytes(4, "big"))
             sender.send(message)
