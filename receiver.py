@@ -8,25 +8,22 @@ def main():
     receiver.listen(1)
     print("Receiver is listening on port 9999")
     p, g, mult, c, m = read_config()
-    a, ka = generate_DF_keys(p, g)
+    a, ka = generate_private_public_keys(p, g)
     print(f"Receiver's private key: {a}, public key: {ka}")
-    is_send=True
+    is_send = True
     while is_send:
         sender, _ = receiver.accept()
-        kb = int(sender.recv(1024).decode())
-        shared_key = (kb**a) % p
-        print(f"Received sender's public key: {kb}")
         sender.send(str(ka).encode())
         received_seed = sender.recv(1024).decode()
-        if not (is_hmac_valid(shared_key, received_seed[:-64], received_seed[-64:])):
+        if not (is_hmac_valid(a, p, received_seed[:-64], received_seed[-64:])):
             print("message is not authentication")
             break
-        seed = int(dencrypt_seed(shared_key, p, received_seed[:-64]))
-        with open("output.txt", "wb") as f: 
+        seed = int(dencrypt_seed(a, p, received_seed[:-64]))
+        with open("output.txt", "wb") as f:
             while True:
                 length_bytes = sender.recv(4)
                 if not length_bytes or len(length_bytes) != 4:
-                    is_send=False
+                    is_send = False
                     break
                 chunk_length = int.from_bytes(length_bytes, byteorder="big")
                 encrypted_data = b""
@@ -39,5 +36,6 @@ def main():
                     break
                 seed = receive_message(f, encrypted_data, seed, mult, c, m)
         sender.close()
-        
+
+
 main()
