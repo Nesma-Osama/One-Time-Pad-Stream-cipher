@@ -54,6 +54,13 @@ def encrypt_seed(ka, c1, b, p, data):
     return cipher_json, shared_key
 
 
+def get_recieved_parameters(ciphere_text):
+    ciphere_text = json.loads(ciphere_text)
+    c1 = ciphere_text["c1"]
+    c2 = ciphere_text["c2"]
+    return c1, c2
+
+
 def dencrypt_seed(a, p, cipher_text):
     print("-------------------------------------------------------------------------")
     print("[Function] dencrypt_seed")
@@ -65,13 +72,6 @@ def dencrypt_seed(a, p, cipher_text):
     seed = "".join([chr((int(ch) * s_inv) % p) for ch in c2])
     print("[Output] Decrypted plain seed:", seed)
     return seed
-
-
-def get_recieved_parameters(ciphere_text):
-    ciphere_text = json.loads(ciphere_text)
-    c1 = ciphere_text["c1"]
-    c2 = ciphere_text["c2"]
-    return c1, c2
 
 
 def generate_hmac_key(key):
