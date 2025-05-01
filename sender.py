@@ -13,7 +13,12 @@ def main():
     print(f"Received receiver's public key: {ka}")
     cipher_seed, shared_key = encrypt_seed(ka, c1, b, p, initail_seed)
     hmac_result = generate_hmac(cipher_seed, shared_key)
-    sender.send((cipher_seed + hmac_result).encode())
+    # Send length first (4-byte header)
+    sender.send(len((cipher_seed + hmac_result).encode()).to_bytes(4, "big"))
+    # Then send actual data
+    sender.sendall(
+        (cipher_seed + hmac_result).encode()
+    )  # sendall ensures complete transmission
     send_message("./input.txt", sender, initail_seed, mult, c, m)
 
 

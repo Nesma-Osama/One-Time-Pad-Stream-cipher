@@ -2,6 +2,8 @@ import json
 import random
 import hmac
 import hashlib
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
 
 
 def read_config():
@@ -14,6 +16,7 @@ def read_config():
         config["Encryption"]["c"],
         config["Encryption"]["m"],
     )
+    p = int(p, 16)
     return p, g, a, c, m
 
 
@@ -32,8 +35,8 @@ def LGC(x, a, c, m):
 
 
 def generate_private_public_keys(p, g):
-    private_key = random.randint(2, p - 2)
-    public_key = (g**private_key) % p
+    private_key = random.SystemRandom().randint(2, p - 2)
+    public_key = pow(g, private_key, p)
     return private_key, public_key
 
 
@@ -45,12 +48,12 @@ def encrypt_seed(ka, c1, b, p, data):
     print(f"  Private key (b) = {b}")
     print(f"  Prime number (p) = {p}")
     print(f"  Data = {data}")
-    data = str(data)
-    c2 = [(ord(ch) * (ka**b)) % p for ch in data]
-    cipher_json = json.dumps({"c1": c1, "c2": c2})
+    data = data
+    shared_key = pow(ka, b, p)
+    c2 = (data * shared_key) % p
+    cipher_json = json.dumps({"c1": (c1), "c2": c2})
     print("Output:")
     print(f"  Encrypted seed = {cipher_json}")
-    shared_key = (ka**b) % p
     return cipher_json, shared_key
 
 
@@ -67,23 +70,29 @@ def dencrypt_seed(a, p, cipher_text):
     print("[Input] Prime number (p):", p)
     print("[Input] Cipher text:", cipher_text)
     c1, c2 = get_recieved_parameters(cipher_text)
-    s = c1**a % p
+    s = pow(c1, a, p)
     s_inv = pow(s, -1, p)
-    seed = "".join([chr((int(ch) * s_inv) % p) for ch in c2])
+    seed = c2 * s_inv % p
     print("[Output] Decrypted plain seed:", seed)
     return seed
 
 
-def generate_hmac_key(key):
+def generate_32byte_key(key):
     print("-------------------------------------------------------------------------")
-    print("[Function] generate_hmac_key")
+    print("[Function] generate_32byte_key")
     print("[Input] Shared key:", key)
 
     key_bytes = key.to_bytes((key.bit_length() + 7) // 8, "big")
-    hmac_key = hashlib.sha256(key_bytes).digest()
-
-    print("[Output] HMAC key:", hmac_key)
-    return hmac_key
+    hkdf = HKDF(
+    algorithm=hashes.SHA256(),
+    length=32,  # Output 32 bytes for AES-256
+    salt=None,
+    info=b'AES-256 key',
+    )
+    key = hkdf.derive(key_bytes) 
+    print("[Output] HMAC key:", key)
+    print("[Output] HMAC key:", len(key))
+    return key
 
 
 def generate_hmac(message, key):
@@ -92,9 +101,9 @@ def generate_hmac(message, key):
     print("[Input] Message:", message)
     print("[Input] Key:", key)
 
-    key = generate_hmac_key(key)
+    key = generate_32byte_key(key)
     hmac_result = hmac.new(key, message.encode(), hashlib.sha256).hexdigest()
-
+    
     print("[Output] HMAC key:", key)
     print("[Output] HMAC result:", hmac_result)
     return hmac_result
@@ -106,8 +115,8 @@ def is_hmac_valid(a, p, cipher_text, received_hmac):
     print("[Input] Message:", cipher_text)
     print("[Input] Received HMAC:", received_hmac)
     c1, _ = get_recieved_parameters(cipher_text)
-    key = c1**a % p
-    key = generate_hmac_key(key)
+    key = pow(c1, a, p)
+    key = generate_32byte_key(key)
     hmac_result = hmac.new(key, cipher_text.encode(), hashlib.sha256).hexdigest()
 
     print("[Computed HMAC]:", hmac_result)
