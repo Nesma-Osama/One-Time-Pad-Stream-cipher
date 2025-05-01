@@ -45,6 +45,7 @@ def main():
                 encrypted_data=receive_binary(sender)
                 if(encrypted_data is None):
                     is_send=False
+                    break
                 seed = receive_message(f, encrypted_data, seed, mult, c, m)
         sender.close()
 
