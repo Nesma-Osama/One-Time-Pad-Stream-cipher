@@ -4,6 +4,8 @@ import hmac
 import hashlib
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import os
 
 
 def read_config():
@@ -38,6 +40,56 @@ def generate_private_public_keys(p, g):
     private_key = random.SystemRandom().randint(2, p - 2)
     public_key = pow(g, private_key, p)
     return private_key, public_key
+
+
+def generate_32byte_key(key):
+    print("-------------------------------------------------------------------------")
+    print("[Function] generate_32byte_key")
+    print("[Input] Shared key:", key)
+
+    key_bytes = key.to_bytes((key.bit_length() + 7) // 8, "big")
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,  # Output 32 bytes for AES-256
+        salt=None,
+        info=b"AES-256 key",
+    )
+    key = hkdf.derive(key_bytes)
+    print("[Output] HMAC key:", key)
+    print("[Output] HMAC key:", len(key))
+    return key
+
+
+def encrypt_seed_AES(shared_key, seed):
+    print("-------------------------------------------------------------------------")
+    print("Function: encrypt_seed_AES")
+    print("Inputs:")
+    print(f"  shared key (ka) = {shared_key}")
+    print(f"  seed  = {seed}")
+    nonce = os.urandom(16)  # 16-byte nonce (must be unique per key!)
+    key = generate_32byte_key(shared_key)
+    # Encrypt data (no padding needed!)
+    data = str(seed).encode()
+    cipher = Cipher(algorithms.AES(key), modes.CTR(nonce))
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(data) + encryptor.finalize()
+    return nonce + ciphertext
+
+
+def decrypt_seed_AES(shared_key, message):
+    print("-------------------------------------------------------------------------")
+    print("Function: decrypt_seed_AES")
+    print("Inputs:")
+    print(f"  shared key (ka) = {shared_key}")
+    print(f"  message  = {message}")
+    nonce = message[:16]
+    key = generate_32byte_key(shared_key)
+    # Encrypt data (no padding needed!)
+    data = message[16:]
+    cipher = Cipher(algorithms.AES(key), modes.CTR(nonce))
+    decryptor = cipher.decryptor()
+    plaintext = decryptor.update(data) + decryptor.finalize()
+    return plaintext.decode()
 
 
 def encrypt_seed(ka, c1, b, p, data):
@@ -77,24 +129,6 @@ def dencrypt_seed(a, p, cipher_text):
     return seed
 
 
-def generate_32byte_key(key):
-    print("-------------------------------------------------------------------------")
-    print("[Function] generate_32byte_key")
-    print("[Input] Shared key:", key)
-
-    key_bytes = key.to_bytes((key.bit_length() + 7) // 8, "big")
-    hkdf = HKDF(
-    algorithm=hashes.SHA256(),
-    length=32,  # Output 32 bytes for AES-256
-    salt=None,
-    info=b'AES-256 key',
-    )
-    key = hkdf.derive(key_bytes) 
-    print("[Output] HMAC key:", key)
-    print("[Output] HMAC key:", len(key))
-    return key
-
-
 def generate_hmac(message, key):
     print("-------------------------------------------------------------------------")
     print("[Function] generate_hmac")
@@ -102,22 +136,29 @@ def generate_hmac(message, key):
     print("[Input] Key:", key)
 
     key = generate_32byte_key(key)
-    hmac_result = hmac.new(key, message.encode(), hashlib.sha256).hexdigest()
-    
+    if isinstance(message, str):
+        message = message.encode()
+    hmac_result = hmac.new(key, message, hashlib.sha256).hexdigest()
+
     print("[Output] HMAC key:", key)
     print("[Output] HMAC result:", hmac_result)
     return hmac_result
 
 
-def is_hmac_valid(a, p, cipher_text, received_hmac):
+def is_hmac_valid(a, p, cipher_text, received_hmac, AES_shared_key):
     print("-------------------------------------------------------------------------")
     print("[Function] is_hmac_valid")
     print("[Input] Message:", cipher_text)
     print("[Input] Received HMAC:", received_hmac)
-    c1, _ = get_recieved_parameters(cipher_text)
-    key = pow(c1, a, p)
+    if AES_shared_key is None:
+        c1, _ = get_recieved_parameters(cipher_text)
+        key = pow(c1, a, p)
+    else:
+        key = AES_shared_key
     key = generate_32byte_key(key)
-    hmac_result = hmac.new(key, cipher_text.encode(), hashlib.sha256).hexdigest()
+    if isinstance(cipher_text, str):
+        cipher_text = cipher_text.encode()
+    hmac_result = hmac.new(key, cipher_text, hashlib.sha256).hexdigest()
 
     print("[Computed HMAC]:", hmac_result)
     print(
